@@ -90,7 +90,7 @@ export const analyzeTranscript = (transcript: string): AnalysisResult => {
       questions.push("What solutions have they tried so far?");
     }
     if (questions.length < 2 && foundTriggerWords.some(word => TRIGGER_WORDS.emotion.some(w => w.toLowerCase() === word.toLowerCase()))) {
-      questions.push("How does this make them feel?");
+      questions.push("Can you tell me more about what led to that feeling?");
     }
     if (questions.length < 2 && foundTriggerWords.some(word => TRIGGER_WORDS.feature.some(w => w.toLowerCase() === word.toLowerCase()))) {
       questions.push("What features would help solve this problem?");
