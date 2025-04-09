@@ -73,7 +73,6 @@ button:hover {
 /* Paper component styles */
 .MuiPaper-root {
   border-radius: 12px !important;
-  box-shadow: none !important;
 }
 
 /* AppBar styles */
