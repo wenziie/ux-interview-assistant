@@ -141,7 +141,7 @@ const OngoingInterview = () => {
         recognitionRef.current.stop();
       }
     };
-  }, [currentLanguage, addTranscriptEntry, updateTranscriptEntry, isRecording, isPaused]);
+  }, [currentLanguage, addTranscriptEntry, updateTranscriptEntry]);
 
   // Add a new useEffect to monitor transcript for AI silence suggestions
   useEffect(() => {
