@@ -65,7 +65,7 @@ const FollowUpBanner = ({ questions, triggerWords, onClose }: FollowUpBannerProp
 
   return (
     <Paper
-      elevation={3}
+      // elevation={3} // Keeping elevation prop commented for now, focusing on direct sx style
       sx={{
         position: 'fixed',
         bottom: 20,
@@ -76,6 +76,7 @@ const FollowUpBanner = ({ questions, triggerWords, onClose }: FollowUpBannerProp
         bgcolor: '#FFF8E1',
         borderRadius: 3,
         borderLeft: '4px solid #FFC107',
+        boxShadow: '0px 3px 3px -2px rgba(0,0,0,0.2), 0px 3px 4px 0px rgba(0,0,0,0.14), 0px 1px 8px 0px rgba(0,0,0,0.12)', // Added direct box-shadow
       }}
     >
       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
