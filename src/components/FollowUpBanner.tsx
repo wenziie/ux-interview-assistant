@@ -65,6 +65,7 @@ const FollowUpBanner = ({ questions, triggerWords, onClose }: FollowUpBannerProp
 
   return (
     <Paper
+      elevation={3}
       sx={{
         position: 'fixed',
         bottom: 20,
