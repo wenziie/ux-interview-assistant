@@ -61,7 +61,7 @@ const TranscriptEntry = ({ entry }: TranscriptEntryProps) => {
         >
           {entry.speaker === 'user' && entry.triggerWords && entry.triggerWords.length > 0 ? (
             <>
-              {entry.text.split(new RegExp(`(${entry.triggerWords.map(word => word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|')})`, 'i')).map((part, i) => {
+              {entry.text.split(new RegExp(`(${entry.triggerWords.map(word => word.replace(/[-\\^$*+?.()|[\]{}]/g, '\\$&')).join('|')})`, 'i')).map((part, i) => {
                 // Check if this part matches any trigger word (case insensitive)
                 const isTrigger = entry.triggerWords?.some(
                   word => part.toLowerCase() === word.toLowerCase()

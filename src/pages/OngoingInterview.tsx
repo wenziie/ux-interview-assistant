@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Box,
@@ -9,12 +8,8 @@ import {
   Stack,
   Alert,
   Snackbar,
-  CircularProgress,
 } from '@mui/material';
 import {
-  Settings,
-  Person,
-  Lightbulb,
 } from '@mui/icons-material';
 import useInterviewStore from '../store/interviewStore';
 import { audioRecorder } from '../utils/audioUtils';
@@ -23,7 +18,6 @@ import FollowUpBanner from '../components/FollowUpBanner';
 import TranscriptEntry from '../components/TranscriptEntry';
 
 const OngoingInterview = () => {
-  const navigate = useNavigate();
   const {
     isRecording,
     isPaused,
@@ -41,12 +35,10 @@ const OngoingInterview = () => {
   } = useInterviewStore();
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
   const [showLanguageAlert, setShowLanguageAlert] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
-  const lastAnalysisRef = useRef<number>(0);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -149,7 +141,7 @@ const OngoingInterview = () => {
         recognitionRef.current.stop();
       }
     };
-  }, [currentLanguage, addTranscriptEntry, updateTranscriptEntry]);
+  }, [currentLanguage, addTranscriptEntry, updateTranscriptEntry, isRecording, isPaused]);
 
   // Add a new useEffect to monitor transcript for AI silence suggestions
   useEffect(() => {
@@ -194,7 +186,7 @@ const OngoingInterview = () => {
     recognitionRef.current?.stop();
     const blob = await audioRecorder.stopRecording();
     if (blob) {
-      setAudioBlob(blob);
+      // setAudioBlob(blob);
     }
     stopRecordingStore();
     

@@ -13,7 +13,6 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
-  Divider,
   Stack,
   Alert,
   Drawer,
@@ -25,9 +24,6 @@ import {
   Delete,
   Download,
   Summarize,
-  Settings,
-  Person,
-  Lightbulb,
   Article,
   Close,
 } from '@mui/icons-material';
@@ -67,17 +63,24 @@ const Archives = () => {
 
   useEffect(() => {
     try {
-      const savedInterviews = JSON.parse(localStorage.getItem('interviews') || '[]');
-      const validInterviews = savedInterviews.filter((interview: any) => {
+      const savedInterviews = JSON.parse(localStorage.getItem('interviews') || '[]') as unknown[];
+      const validInterviews = savedInterviews.filter((interview: unknown): interview is Interview => {
         return (
-          interview &&
-          typeof interview.id === 'string' &&
-          typeof interview.date === 'string' &&
-          typeof interview.context === 'string' &&
-          Array.isArray(interview.transcript) &&
-          interview.transcript.every((entry: any, index: number) => {
-            if (!entry.id) entry.id = `${interview.id}-entry-${index}`;
-            return true;
+          typeof interview === 'object' &&
+          interview !== null &&
+          'id' in interview && typeof interview.id === 'string' &&
+          'date' in interview && typeof interview.date === 'string' &&
+          'context' in interview && typeof interview.context === 'string' &&
+          'transcript' in interview && Array.isArray(interview.transcript) &&
+          interview.transcript.every((entry: unknown, index: number): boolean => {
+             if (typeof entry === 'object' && entry !== null &&
+                 'text' in entry && 'speaker' in entry && 'timestamp' in entry) {
+               if (!('id' in entry) || typeof (entry as {id?: unknown}).id !== 'string') {
+                 (entry as {id?: unknown}).id = `${(interview as Interview).id}-entry-${index}`;
+               }
+               return true;
+             }
+             return false;
           })
         );
       });
@@ -189,10 +192,6 @@ const Archives = () => {
       setShowDeleteDialog(false);
       setInterviewToDelete(null);
     }
-  };
-
-  const getFirstUserSpeech = (transcript: TranscriptEntryType[]) => {
-    return transcript.find(entry => entry.speaker === 'user')?.text || 'No speech recorded';
   };
 
   const renderDetailsContent = (interview: Interview | null) => {
