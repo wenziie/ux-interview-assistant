@@ -8,9 +8,12 @@ import {
   Stack,
   Alert,
   Snackbar,
+  CircularProgress,
 } from '@mui/material';
 import {
+  QueryStats,
 } from '@mui/icons-material';
+import axios from 'axios';
 import useInterviewStore from '../store/interviewStore';
 import { audioRecorder } from '../utils/audioUtils';
 import { analyzeTranscript } from '../utils/aiUtils';
@@ -24,6 +27,7 @@ const OngoingInterview = () => {
     currentLanguage,
     context,
     transcript,
+    assistantMode,
     startRecording: startRecordingStore,
     stopRecording: stopRecordingStore,
     pauseRecording,
@@ -35,16 +39,21 @@ const OngoingInterview = () => {
   } = useInterviewStore();
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const [showFollowUp, setShowFollowUp] = useState(false);
-  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
+  const [bannerQuestions, setBannerQuestions] = useState<string[]>([]);
+  const [showBanner, setShowBanner] = useState(false);
   const [showLanguageAlert, setShowLanguageAlert] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [llmAnalysisError, setLlmAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log(`Setting up SpeechRecognition for language: ${currentLanguage}`);
+    let recognition: SpeechRecognition | null = null;
+    
     if (typeof window !== 'undefined') {
       const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
       if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
+        recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.lang = currentLanguage === 'en' ? 'en-US' : 'sv-SE';
@@ -53,13 +62,11 @@ const OngoingInterview = () => {
           const lastResult = event.results[event.results.length - 1];
           const transcriptText = lastResult[0].transcript;
 
-          // Update interim transcript for live captioning
           if (!lastResult.isFinal) {
             setInterimTranscript(transcriptText);
             return;
           }
 
-          // Reset silence timer when speech is detected
           audioRecorder.updateLastSpeechTime();
           
           setInterimTranscript('');
@@ -70,95 +77,99 @@ const OngoingInterview = () => {
             second: '2-digit' 
           });
           
-          // Debug logging
           console.log("DETECTED SPEECH:", transcriptText);
           
-          // Add the new utterance to transcript
           addTranscriptEntry({
             text: transcriptText,
             speaker: 'user',
             timestamp,
           });
 
-          // Force analyze the transcript immediately with no cooldown
-          const analysis = analyzeTranscript(transcriptText);
-          console.log("SPEECH ANALYSIS RESULT:", analysis);
-          
-          if (analysis.triggerWords.length > 0) {
-            console.log("FOUND TRIGGER WORDS:", analysis.triggerWords);
-            setFollowUpQuestions(analysis.questions);
-            setShowFollowUp(true);
+          if (assistantMode === 'hardcoded' && currentLanguage === 'en') {
+            const analysis = analyzeTranscript(transcriptText);
+            console.log("SPEECH ANALYSIS RESULT (Hardcoded logic):", analysis);
             
-            // Add AI suggestion to transcript
-            addTranscriptEntry({
-              text: `AI suggests:\n${analysis.questions.map(q => `• ${q}`).join('\n')}`,
-              speaker: 'ai',
-              type: 'keyword',
-              timestamp,
-              questions: analysis.questions,
-              triggerWords: analysis.triggerWords,
-            });
-            
-            // Get all transcript entries again to make sure we have the latest
-            setTimeout(() => {
-              const allEntries = useInterviewStore.getState().transcript;
-              const userEntries = allEntries.filter(entry => entry.speaker === 'user');
-              if (userEntries.length > 0) {
-                const lastUserEntry = userEntries[userEntries.length - 1];
-                console.log("UPDATING ENTRY WITH TRIGGER WORDS:", lastUserEntry);
-                updateTranscriptEntry(lastUserEntry.id, {
-                  triggerWords: analysis.triggerWords
-                });
-              }
-            }, 100);
+            if (analysis.triggerWords.length > 0) {
+              console.log("FOUND TRIGGER WORDS (Hardcoded logic):", analysis.triggerWords);
+              setBannerQuestions(analysis.questions);
+              setShowBanner(true);
+              
+              addTranscriptEntry({
+                text: `Hardcoded assistant suggests:\n${analysis.questions.map(q => `• ${q}`).join('\n')}`,
+                speaker: 'ai',
+                type: 'keyword',
+                timestamp,
+                questions: analysis.questions,
+                triggerWords: analysis.triggerWords,
+              });
+              
+              setTimeout(() => {
+                const allEntries = useInterviewStore.getState().transcript;
+                const userEntries = allEntries.filter(entry => entry.speaker === 'user');
+                if (userEntries.length > 0) {
+                  const lastUserEntry = userEntries[userEntries.length - 1];
+                  console.log("UPDATING ENTRY WITH TRIGGER WORDS (Hardcoded logic):", lastUserEntry);
+                  updateTranscriptEntry(lastUserEntry.id, {
+                    triggerWords: analysis.triggerWords
+                  });
+                }
+              }, 100);
+            }
           }
         };
 
         recognition.onerror = (event) => {
-          if (event.error === 'no-speech') return; // Ignore no-speech errors
-          console.error('Speech recognition error:', event.error);
-          // Only add silence message if we're still recording
-          if (isRecording && !isPaused) {
-            addTranscriptEntry({
-              text: 'Silence detected...',
-              speaker: 'system',
-              timestamp: new Date().toLocaleTimeString('en-US', { 
-                hour12: false, 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit' 
-              }),
-            });
+          if (event.error === 'no-speech') { 
+              console.log('Speech recognition: no-speech error.');
+              return; 
           }
+          if (event.error === 'audio-capture') { 
+              console.warn('Speech recognition: audio-capture error.');
+              return; 
+          }
+          console.error('Speech recognition error:', event.error, event.message);
         };
-
+        
         recognitionRef.current = recognition;
+        
+        if (isRecording && !isPaused) {
+            console.log('Restarting recognition due to language change while recording.');
+            recognitionRef.current?.start();
+        }
+
+      } else {
+         console.error("Speech Recognition API not supported in this browser.");
       }
     }
 
     return () => {
+      console.log("Cleaning up SpeechRecognition instance.");
       if (recognitionRef.current) {
         recognitionRef.current.stop();
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current = null;
       }
+      setInterimTranscript(''); 
     };
-  }, [currentLanguage, addTranscriptEntry, updateTranscriptEntry]);
+  }, [currentLanguage, addTranscriptEntry, updateTranscriptEntry, isRecording, isPaused, assistantMode]);
 
-  // Add a new useEffect to monitor transcript for AI silence suggestions
   useEffect(() => {
-    // Check if the latest transcript entry is an AI silence suggestion
-    if (transcript.length > 0) {
-      const latestEntry = transcript[transcript.length - 1];
-      if (latestEntry.speaker === 'ai' && latestEntry.type === 'silence' && latestEntry.questions) {
-        // Show the AI questions in the bottom right corner
-        setFollowUpQuestions(latestEntry.questions);
-        setShowFollowUp(true);
+    if (assistantMode === 'hardcoded' && currentLanguage === 'en') {
+      if (transcript.length > 0) {
+        const latestEntry = transcript[transcript.length - 1];
+        if (latestEntry.speaker === 'ai' && latestEntry.type === 'silence' && latestEntry.questions) {
+          console.log("Silence detected (Hardcoded logic), showing banner.");
+          setBannerQuestions(latestEntry.questions);
+          setShowBanner(true);
+        }
       }
     }
-  }, [transcript]);
+  }, [transcript, assistantMode, currentLanguage]);
 
   const handleStartRecording = async () => {
-    clearTranscript(); // Clear previous transcript
-    const success = await audioRecorder.startRecording();
+    clearTranscript();
+    const success = await audioRecorder.startRecording(currentLanguage, assistantMode);
     if (success) {
       const timestamp = new Date().toLocaleTimeString('en-US', { 
         hour12: false, 
@@ -167,7 +178,13 @@ const OngoingInterview = () => {
         second: '2-digit' 
       });
       startRecordingStore();
-      recognitionRef.current?.start();
+      if (recognitionRef.current) {
+        console.log("Starting speech recognition...");
+        recognitionRef.current.start();
+      } else {
+        console.error("Cannot start recording: SpeechRecognition not initialized.");
+        return;
+      }
       addTranscriptEntry({
         text: 'Recording started',
         speaker: 'system',
@@ -177,33 +194,30 @@ const OngoingInterview = () => {
   };
 
   const handleStopRecording = async () => {
+    console.log("Stopping speech recognition...");
+    recognitionRef.current?.stop();
     const timestamp = new Date().toLocaleTimeString('en-US', { 
       hour12: false, 
       hour: '2-digit', 
       minute: '2-digit', 
       second: '2-digit' 
     });
-    recognitionRef.current?.stop();
     const blob = await audioRecorder.stopRecording();
     if (blob) {
       // setAudioBlob(blob);
     }
     stopRecordingStore();
     
-    // Add the "recording stopped" message first
     addTranscriptEntry({
       text: 'Recording stopped',
       speaker: 'system',
       timestamp,
     });
 
-    // Wait a brief moment to ensure the last message is added
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // Get the latest transcript after adding the "recording stopped" message
     const latestTranscript = useInterviewStore.getState().transcript;
 
-    // Auto-save the interview with proper transcript formatting
     const formattedTranscript = latestTranscript.map(entry => ({
       text: entry.text,
       speaker: entry.speaker,
@@ -217,18 +231,16 @@ const OngoingInterview = () => {
       id: Date.now().toString(),
       date: new Date().toISOString(),
       context,
+      aiFeaturesEnabled: assistantMode === 'ai',
       transcript: formattedTranscript,
       audioUrl: blob ? URL.createObjectURL(blob) : undefined,
     };
 
     try {
-      // Get existing interviews or initialize empty array
       const existingInterviews = JSON.parse(localStorage.getItem('interviews') || '[]');
       
-      // Add new interview
       existingInterviews.push(interview);
       
-      // Save back to localStorage
       localStorage.setItem('interviews', JSON.stringify(existingInterviews));
       
       console.log('Interview saved successfully:', interview.id);
@@ -246,6 +258,7 @@ const OngoingInterview = () => {
     });
     if (isPaused) {
       resumeRecording();
+      console.log("Resuming speech recognition...");
       recognitionRef.current?.start();
       addTranscriptEntry({
         text: 'Recording resumed',
@@ -254,6 +267,7 @@ const OngoingInterview = () => {
       });
     } else {
       pauseRecording();
+      console.log("Pausing speech recognition...");
       recognitionRef.current?.stop();
       addTranscriptEntry({
         text: 'Recording paused',
@@ -263,9 +277,53 @@ const OngoingInterview = () => {
     }
   };
 
+  const handleAnalyzeNow = async () => {
+    if (assistantMode !== 'ai' || isAnalyzing || isPaused) return;
+
+    setIsAnalyzing(true);
+    setLlmAnalysisError(null);
+    setShowBanner(false);
+    console.log('Sending data for LLM analysis:', { context, transcript });
+
+    try {
+      const currentTranscript = useInterviewStore.getState().transcript;
+      const payload = { context, transcript: currentTranscript };
+      const response = await axios.post('http://localhost:5001/api/analyze', payload);
+      console.log('LLM Backend response:', response.data);
+      
+      const analysisText = response.data.analysis || response.data.message || 'Analysis complete.';
+      const timestamp = new Date().toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit' 
+      });
+
+      addTranscriptEntry({
+        text: `AI Assistant:\n${analysisText}`,
+        speaker: 'ai',
+        timestamp,
+      });
+      
+      setBannerQuestions([analysisText]);
+      setShowBanner(true);
+
+    } catch (error) {
+      console.error('Error calling LLM analyze API:', error);
+      let errorMessage = 'Failed to get analysis from AI Assistant.';
+      if (axios.isAxiosError(error) && error.response) {
+        errorMessage += ` Server responded with: ${error.response.data?.message || error.response.statusText}`;
+      } else if (error instanceof Error) {
+        errorMessage += ` ${error.message}`;
+      }
+      setLlmAnalysisError(errorMessage);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 0, sm: 2 } }}>
-      {/* Header Section with Responsive Layout */}
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         justifyContent="space-between"
@@ -355,7 +413,6 @@ const OngoingInterview = () => {
         </Typography>
       </Paper>
 
-      {/* Recording controls */}
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
         {!isRecording ? (
           <Button
@@ -366,7 +423,7 @@ const OngoingInterview = () => {
             Start Recording
           </Button>
         ) : (
-          <Stack direction="row" spacing={2}>
+          <Stack direction="row" spacing={2} alignItems="center">
             <Button
               variant="contained"
               color="primary"
@@ -374,6 +431,19 @@ const OngoingInterview = () => {
             >
               {isPaused ? 'Resume Recording' : 'Pause Recording'}
             </Button>
+            
+            {assistantMode === 'ai' && (
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={handleAnalyzeNow}
+                disabled={isAnalyzing || isPaused}
+                startIcon={isAnalyzing ? <CircularProgress size={20} color="inherit" /> : <QueryStats />}
+              >
+                {isAnalyzing ? 'Analyzing...' : 'Analyze Now'}
+              </Button>
+            )}
+            
             <Button
               variant="outlined"
               color="error"
@@ -385,19 +455,21 @@ const OngoingInterview = () => {
         )}
       </Box>
 
+      {llmAnalysisError && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLlmAnalysisError(null)}>{llmAnalysisError}</Alert>
+      )}
+
       <Paper sx={{ p: 3, minHeight: 400, bgcolor: '#ffffff' }}>
         <Typography variant="h6" gutterBottom>
           Transcript
         </Typography>
 
-        {/* Empty state */}
         {transcript.length === 0 && !interimTranscript && (
           <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', mt: 8 }}>
             Your transcript will appear here when you start recording
           </Typography>
         )}
 
-        {/* Live caption */}
         {isRecording && interimTranscript && (
           <>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -420,17 +492,16 @@ const OngoingInterview = () => {
           </>
         )}
 
-        {/* Transcript entries */}
         {transcript.map((entry, index) => (
-          <TranscriptEntry key={index} entry={entry} />
+          <TranscriptEntry key={entry.id || index} entry={entry} />
         ))}
       </Paper>
 
-      {showFollowUp && (
-        <Box sx={{ position: 'fixed', bottom: 24, right: 24 }}>
+      {showBanner && (
+        <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1300 }}>
           <FollowUpBanner
-            questions={followUpQuestions}
-            onClose={() => setShowFollowUp(false)}
+            questions={bannerQuestions}
+            onClose={() => setShowBanner(false)}
           />
         </Box>
       )}
@@ -441,8 +512,8 @@ const OngoingInterview = () => {
         onClose={() => setShowLanguageAlert(false)}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert onClose={() => setShowLanguageAlert(false)} severity="info">
-          AI features are only available in English
+        <Alert onClose={() => setShowLanguageAlert(false)} severity="info" sx={{ width: '100%' }}>
+          Hardcoded assistance is only available in English.
         </Alert>
       </Snackbar>
     </Container>

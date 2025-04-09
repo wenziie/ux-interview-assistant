@@ -7,18 +7,24 @@ import {
   Button,
   Box,
   Paper,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  FormControl,
+  FormLabel,
 } from '@mui/material';
 import useInterviewStore from '../store/interviewStore';
 
 const NewInterview = () => {
   const navigate = useNavigate();
-  const setContext = useInterviewStore(state => state.setContext);
+  const setContextAndMode = useInterviewStore(state => state.setContextAndMode);
   const clearTranscript = useInterviewStore(state => state.clearTranscript);
   const [context, setLocalContext] = useState('');
+  const [mode, setMode] = useState<'hardcoded' | 'ai'>('hardcoded');
 
   const handleStartInterview = () => {
     clearTranscript();
-    setContext(context);
+    setContextAndMode(context, mode);
     navigate('/interview');
   };
 
@@ -88,6 +94,41 @@ const NewInterview = () => {
             }
           }}
         />
+        
+        <FormControl component="fieldset" sx={{ mb: 3, width: '100%' }}>
+          <FormLabel component="legend" sx={{ mb: 1, fontWeight: 'bold', color: 'text.primary' }}>
+            Which assistant would you like to use?
+          </FormLabel>
+          <RadioGroup
+            aria-label="assistant-mode"
+            name="assistant-mode-radio-buttons-group"
+            value={mode}
+            onChange={(e) => setMode(e.target.value as 'hardcoded' | 'ai')}
+          >
+            <FormControlLabel 
+              value="hardcoded" 
+              control={<Radio />} 
+              label={
+                <Box>
+                  <Typography variant="body1" component="span" sx={{ fontWeight: 500 }}>Hardcoded</Typography>
+                  <Typography variant="body2" color="text.secondary">Relies on fixed rules. Simple, no context awareness.</Typography>
+                </Box>
+              }
+              sx={{ mb: 1 }} 
+            />
+            <FormControlLabel 
+              value="ai" 
+              control={<Radio />} 
+              label={
+                <Box>
+                  <Typography variant="body1" component="span" sx={{ fontWeight: 500 }}>AI (LLM)</Typography>
+                  <Typography variant="body2" color="text.secondary">Powered by OpenAI (paid API). Understands context, adapts.</Typography>
+                </Box>
+              } 
+            />
+          </RadioGroup>
+        </FormControl>
+
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'center', gap: 2, mt: 3 }}>
           <Button
             variant="outlined"

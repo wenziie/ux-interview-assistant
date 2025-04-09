@@ -45,7 +45,7 @@ class AudioRecorder {
       
       // Add AI entry with formatted questions
       store.addTranscriptEntry({
-        text: `AI suggests:\n${aiQuestions.map(q => `• ${q}`).join('\n')}`,
+        text: `Hardcoded assistant suggests:\n${aiQuestions.map(q => `• ${q}`).join('\n')}`,
         speaker: 'ai',
         type: 'silence',
         timestamp: new Date().toLocaleTimeString('en-US', { 
@@ -63,19 +63,31 @@ class AudioRecorder {
     }
   }
 
-  async startRecording(): Promise<boolean> {
+  // Modified to accept language AND mode
+  async startRecording(language: 'en' | 'sv', mode: 'hardcoded' | 'ai'): Promise<boolean> {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       this.mediaRecorder = new MediaRecorder(stream);
       this.audioChunks = [];
       this.lastSpeechTime = Date.now();
-      this.hasSpeechOccurred = false; // Reset the speech flag when starting a new recording
+      this.hasSpeechOccurred = false;
 
       this.mediaRecorder.ondataavailable = this.handleDataAvailable;
-      this.mediaRecorder.start(1000); // Collect data every second
+      this.mediaRecorder.start(1000); 
 
-      // Start silence detection
-      this.silenceTimeout = setInterval(this.handleSilence, 1000);
+      // Clear any existing timer first
+      if (this.silenceTimeout) {
+        clearInterval(this.silenceTimeout);
+        this.silenceTimeout = null;
+      }
+
+      // Only start silence detection timer if in hardcoded mode AND English
+      if (mode === 'hardcoded' && language === 'en') {
+        console.log("Starting silence detection interval (Hardcoded mode, English).");
+        this.silenceTimeout = setInterval(this.handleSilence, 1000);
+      } else {
+        console.log("Silence detection disabled (AI mode or non-English language).");
+      }
 
       return true;
     } catch (error) {

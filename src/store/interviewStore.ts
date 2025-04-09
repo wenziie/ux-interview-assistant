@@ -15,13 +15,14 @@ interface InterviewStore {
   isPaused: boolean;
   currentLanguage: 'en' | 'sv';
   context: string;
+  assistantMode: 'hardcoded' | 'ai';
   transcript: TranscriptEntry[];
   startRecording: () => void;
   stopRecording: () => void;
   pauseRecording: () => void;
   resumeRecording: () => void;
   setLanguage: (lang: 'en' | 'sv') => void;
-  setContext: (context: string) => void;
+  setContextAndMode: (context: string, mode: 'hardcoded' | 'ai') => void;
   addTranscriptEntry: (entry: Omit<TranscriptEntry, 'id'>) => void;
   updateTranscriptEntry: (id: string, updates: Partial<Omit<TranscriptEntry, 'id'>>) => void;
   clearTranscript: () => void;
@@ -32,13 +33,14 @@ const useInterviewStore = create<InterviewStore>((set) => ({
   isPaused: false,
   currentLanguage: 'en',
   context: '',
+  assistantMode: 'hardcoded',
   transcript: [],
   startRecording: () => set({ isRecording: true, isPaused: false }),
   stopRecording: () => set({ isRecording: false, isPaused: false }),
   pauseRecording: () => set({ isPaused: true }),
   resumeRecording: () => set({ isPaused: false }),
   setLanguage: (lang) => set({ currentLanguage: lang }),
-  setContext: (context) => set({ context }),
+  setContextAndMode: (context, mode) => set({ context, assistantMode: mode }),
   addTranscriptEntry: (entry) =>
     set((state) => ({
       transcript: [

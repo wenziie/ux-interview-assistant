@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
+import ReactMarkdown from 'react-markdown';
 import {
   Container,
   Box,
@@ -18,7 +20,8 @@ import {
   Drawer,
   useMediaQuery,
   useTheme,
-  IconButton
+  IconButton,
+  CircularProgress,
 } from '@mui/material';
 import {
   Delete,
@@ -27,7 +30,6 @@ import {
   Article,
   Close,
 } from '@mui/icons-material';
-import { generateSummary } from '../utils/aiUtils';
 import TranscriptEntry from '../components/TranscriptEntry';
 
 interface TranscriptEntryType {
@@ -44,18 +46,22 @@ interface Interview {
   id: string;
   date: string;
   context: string;
+  aiFeaturesEnabled?: boolean;
   transcript: TranscriptEntryType[];
   audioUrl?: string;
+  summary?: string;
 }
 
 const Archives = () => {
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
   const [showSummary, setShowSummary] = useState(false);
-  const [summary, setSummary] = useState<string[]>([]);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [interviewToDelete, setInterviewToDelete] = useState<string | null>(null);
+  const [showConfirmSummaryDialog, setConfirmSummaryDialog] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -65,26 +71,30 @@ const Archives = () => {
     try {
       const savedInterviews = JSON.parse(localStorage.getItem('interviews') || '[]') as unknown[];
       const validInterviews = savedInterviews.filter((interview: unknown): interview is Interview => {
-        return (
-          typeof interview === 'object' &&
-          interview !== null &&
-          'id' in interview && typeof interview.id === 'string' &&
-          'date' in interview && typeof interview.date === 'string' &&
-          'context' in interview && typeof interview.context === 'string' &&
-          'transcript' in interview && Array.isArray(interview.transcript) &&
-          interview.transcript.every((entry: unknown, index: number): boolean => {
-             if (typeof entry === 'object' && entry !== null &&
-                 'text' in entry && 'speaker' in entry && 'timestamp' in entry) {
-               if (!('id' in entry) || typeof (entry as {id?: unknown}).id !== 'string') {
-                 (entry as {id?: unknown}).id = `${(interview as Interview).id}-entry-${index}`;
-               }
-               return true;
+        if (!(typeof interview === 'object' && interview !== null &&
+            'id' in interview && typeof interview.id === 'string' &&
+            'date' in interview && typeof interview.date === 'string' &&
+            'context' in interview && typeof interview.context === 'string' &&
+            'transcript' in interview && Array.isArray(interview.transcript)))
+        {
+            return false;
+        }
+        if (('aiFeaturesEnabled' in interview) && typeof (interview as Interview).aiFeaturesEnabled !== 'boolean') return false;
+        if (('audioUrl' in interview) && typeof (interview as Interview).audioUrl !== 'string') return false;
+        if (('summary' in interview) && typeof (interview as Interview).summary !== 'string') return false;
+        
+        return interview.transcript.every((entry: unknown, index: number): boolean => {
+           if (typeof entry === 'object' && entry !== null &&
+               'text' in entry && 'speaker' in entry && 'timestamp' in entry) {
+             if (!('id' in entry) || typeof (entry as {id?: unknown}).id !== 'string') {
+               (entry as {id?: unknown}).id = `${(interview as Interview).id}-entry-${index}`;
              }
-             return false;
-          })
-        );
+             return true;
+           }
+           return false;
+        });
       });
-      
+
       setInterviews(validInterviews);
       setError(null);
     } catch (err) {
@@ -160,25 +170,68 @@ const Archives = () => {
     }
   };
 
-  const handleShowSummary = () => {
-    if (selectedInterview) {
-      try {
-        const userMessages = selectedInterview.transcript
-          .filter(entry => entry.speaker === 'user')
-          .map(entry => entry.text);
+  const fetchSummary = async () => {
+    if (!selectedInterview) return;
 
-        const keyPoints = generateSummary(userMessages.join('\n'), selectedInterview.context)
-          .split('\n')
-          .filter(point => point.trim().length > 0);
+    setIsSummarizing(true);
+    setSummary(null); 
+    setError(null); 
+    setShowSummary(false);
+    setConfirmSummaryDialog(false);
 
-        setSummary(keyPoints);
-        setShowSummary(true);
-        setError(null);
-      } catch (err) {
-        console.error('Error generating summary:', err);
-        setError('Failed to generate summary. Please try again.');
+    try {
+      const payload = {
+        context: selectedInterview.context,
+        transcript: selectedInterview.transcript,
+      };
+      const response = await axios.post('http://localhost:5001/api/summarize', payload);
+      console.log('Summary response:', response.data);
+      
+      const summaryResult = response.data.summary || response.data.message || 'Summary processed.';
+      
+      const updatedInterview = { ...selectedInterview, summary: summaryResult };
+      const updatedInterviews = interviews.map(interview => 
+        interview.id === selectedInterview.id ? updatedInterview : interview
+      );
+      setInterviews(updatedInterviews);
+      setSelectedInterview(updatedInterview);
+      localStorage.setItem('interviews', JSON.stringify(updatedInterviews));
+
+      setSummary(summaryResult);
+      setShowSummary(true);
+
+    } catch (error) {
+      console.error('Error calling summarize API:', error);
+      let errorMessage = 'Failed to generate summary.';
+      if (axios.isAxiosError(error) && error.response) {
+        errorMessage += ` Server responded with: ${error.response.data?.message || error.response.statusText}`;
+      } else if (error instanceof Error) {
+        errorMessage += ` ${error.message}`;
       }
+      setError(errorMessage);
+      setShowSummary(false);
+    } finally {
+      setIsSummarizing(false);
     }
+  };
+
+  const handleRequestSummary = () => {
+    if (!selectedInterview || isSummarizing) return;
+
+    if (selectedInterview.summary) {
+      console.log("Displaying cached summary.");
+      setSummary(selectedInterview.summary);
+      setShowSummary(true);
+      setError(null);
+    } else {
+      console.log("No cached summary, showing confirmation dialog.");
+      setConfirmSummaryDialog(true);
+    }
+  };
+
+  const handleConfirmAndSummarize = () => {
+    setConfirmSummaryDialog(false);
+    fetchSummary();
   };
 
   const handleDeleteClick = (id: string) => {
@@ -219,11 +272,13 @@ const Archives = () => {
             <Button
               variant="outlined"
               size="small"
-              startIcon={<Summarize />}
-              onClick={handleShowSummary}
+              startIcon={isSummarizing ? <CircularProgress size={20} color="inherit" /> : <Summarize />}
+              onClick={handleRequestSummary}
+              disabled={isSummarizing}
               sx={{ flexGrow: { xs: 1, sm: 0 } }}
+              title={"Generate Key Highlights (may incur cost)"}
             >
-              Key Highlights
+              {isSummarizing ? 'Generating...' : 'Key Highlights'}
             </Button>
             <Button
               variant="outlined"
@@ -295,7 +350,7 @@ const Archives = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4, px: { xs: 0, sm: 2 } }}>
+    <Container maxWidth={isMobile || !selectedInterview ? 'md' : 'xl'} sx={{ pt: 2 }}>
       <Typography 
         variant="h4" 
         component="h1" 
@@ -459,6 +514,29 @@ const Archives = () => {
         </DialogActions>
       </Dialog>
 
+      <Dialog
+        open={showConfirmSummaryDialog}
+        onClose={() => setConfirmSummaryDialog(false)}
+        aria-labelledby="confirm-summary-dialog-title"
+        aria-describedby="confirm-summary-dialog-description"
+      >
+        <DialogTitle id="confirm-summary-dialog-title">
+          Generate AI Summary?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-summary-dialog-description">
+            Generating an AI summary uses the OpenAI API which may incur a small cost.
+            Are you sure you want to proceed?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmSummaryDialog(false)}>Cancel</Button>
+          <Button onClick={handleConfirmAndSummarize} variant="contained" autoFocus>
+            Confirm & Generate
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog 
         open={showSummary} 
         onClose={() => setShowSummary(false)} 
@@ -468,29 +546,37 @@ const Archives = () => {
           sx: { borderRadius: 2 }
         }}
       >
-        <DialogTitle>
-          <Typography variant="h6">
+        <DialogTitle sx={{ pb: 3 }}>
+          <Typography variant="h5">
             Key Highlights
           </Typography>
         </DialogTitle>
         <DialogContent>
-          {summary.length > 0 ? (
-            <List>
-              {summary.map((point, index) => (
-                <ListItem key={index}>
-                  <ListItemText
-                    primary={
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        • {point}
-                      </Typography>
-                    }
-                  />
-                </ListItem>
-              ))}
-            </List>
+          {summary ? (
+            <Box sx={{
+              '& p:not(:last-child)': { marginBottom: '1em' },
+              '& > *:first-of-type': { marginTop: 0 }
+            }}>
+              <ReactMarkdown
+                components={{
+                  strong: ({node, ...props}) => 
+                    <Box sx={{ display: 'block' }}>
+                      <Typography 
+                        variant="subtitle1" 
+                        component="span"
+                        gutterBottom
+                        sx={{ fontWeight: 'bold' }} 
+                        {...props} 
+                      />
+                    </Box>
+                }}
+              >
+                {summary}
+              </ReactMarkdown>
+            </Box>
           ) : (
             <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-              No highlights available
+              No highlights generated yet.
             </Typography>
           )}
         </DialogContent>
