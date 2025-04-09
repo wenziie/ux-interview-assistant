@@ -16,6 +16,10 @@ import {
   Divider,
   Stack,
   Alert,
+  Drawer,
+  useMediaQuery,
+  useTheme,
+  IconButton
 } from '@mui/material';
 import {
   Delete,
@@ -25,11 +29,13 @@ import {
   Person,
   Lightbulb,
   Article,
+  Close,
 } from '@mui/icons-material';
 import { generateSummary } from '../utils/aiUtils';
 import TranscriptEntry from '../components/TranscriptEntry';
 
 interface TranscriptEntryType {
+  id: string;
   text: string;
   speaker: 'system' | 'user' | 'ai';
   timestamp: string;
@@ -55,17 +61,24 @@ const Archives = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [interviewToDelete, setInterviewToDelete] = useState<string | null>(null);
 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [isDetailsSheetOpen, setIsDetailsSheetOpen] = useState(false);
+
   useEffect(() => {
     try {
       const savedInterviews = JSON.parse(localStorage.getItem('interviews') || '[]');
-      // Validate the data structure
       const validInterviews = savedInterviews.filter((interview: any) => {
         return (
           interview &&
           typeof interview.id === 'string' &&
           typeof interview.date === 'string' &&
           typeof interview.context === 'string' &&
-          Array.isArray(interview.transcript)
+          Array.isArray(interview.transcript) &&
+          interview.transcript.every((entry: any, index: number) => {
+            if (!entry.id) entry.id = `${interview.id}-entry-${index}`;
+            return true;
+          })
         );
       });
       
@@ -78,12 +91,24 @@ const Archives = () => {
     }
   }, []);
 
+  const handleInterviewSelect = (interview: Interview) => {
+    setSelectedInterview(interview);
+    if (isMobile) {
+      setIsDetailsSheetOpen(true);
+    }
+  };
+
+  const handleCloseSheet = () => {
+    setIsDetailsSheetOpen(false);
+  };
+
   const handleDelete = (id: string) => {
     try {
       const updatedInterviews = interviews.filter(interview => interview.id !== id);
       localStorage.setItem('interviews', JSON.stringify(updatedInterviews));
       setInterviews(updatedInterviews);
       setSelectedInterview(null);
+      setIsDetailsSheetOpen(false);
       setError(null);
     } catch (err) {
       console.error('Error deleting interview:', err);
@@ -110,14 +135,12 @@ const Archives = () => {
 
   const handleDownloadTranscript = (interview: Interview) => {
     try {
-      // Create a formatted transcript text
       const transcriptText = interview.transcript
         .map(entry => `[${entry.timestamp}] ${entry.speaker.toUpperCase()}: ${entry.text}`)
         .join('\n\n');
 
       const fullText = `Interview from ${new Date(interview.date).toLocaleString()}\n\nContext:\n${interview.context}\n\nTranscript:\n${transcriptText}`;
 
-      // Create and trigger download
       const blob = new Blob([fullText], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -137,12 +160,10 @@ const Archives = () => {
   const handleShowSummary = () => {
     if (selectedInterview) {
       try {
-        // Filter out system messages and AI suggestions
         const userMessages = selectedInterview.transcript
           .filter(entry => entry.speaker === 'user')
           .map(entry => entry.text);
 
-        // Generate key points from the transcript
         const keyPoints = generateSummary(userMessages.join('\n'), selectedInterview.context)
           .split('\n')
           .filter(point => point.trim().length > 0);
@@ -174,9 +195,114 @@ const Archives = () => {
     return transcript.find(entry => entry.speaker === 'user')?.text || 'No speech recorded';
   };
 
+  const renderDetailsContent = (interview: Interview | null) => {
+    if (!interview) return null;
+
+    return (
+      <Box sx={{ p: { xs: 2, sm: 3 }, pt: { xs: 5, sm: 3 }, height: '100%', overflowY: 'auto' }}>
+        {isMobile && (
+          <IconButton 
+            aria-label="close sheet" 
+            onClick={handleCloseSheet}
+            sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}
+          >
+            <Close />
+          </IconButton>
+        )}
+
+        <Box sx={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          justifyContent: 'center', 
+          gap: 1, 
+          mb: 3
+        }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Summarize />}
+              onClick={handleShowSummary}
+              sx={{ flexGrow: { xs: 1, sm: 0 } }}
+            >
+              Key Highlights
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Article />}
+              onClick={() => handleDownloadTranscript(interview)}
+              sx={{ flexGrow: { xs: 1, sm: 0 } }}
+            >
+              Download Transcript
+            </Button>
+            {interview.audioUrl && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<Download />}
+                onClick={() => handleDownloadAudio(interview)}
+                sx={{ flexGrow: { xs: 1, sm: 0 } }}
+              >
+                Download Audio
+              </Button>
+            )}
+            <Button
+              variant="outlined"
+              size="small"
+              color="error"
+              startIcon={<Delete />}
+              onClick={() => handleDeleteClick(interview.id)}
+              sx={{ flexGrow: { xs: 1, sm: 0 } }}
+            >
+              Delete
+            </Button>
+        </Box>
+
+        <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
+          <Typography variant="h6" gutterBottom sx={{ fontSize: '1.1rem' }}>
+            Context
+          </Typography>
+          <Typography 
+            variant="body1" 
+            color="text.secondary"
+            sx={{ fontStyle: !interview.context ? 'italic' : 'normal' }}
+          >
+            {interview.context || 'No context provided'}
+          </Typography>
+        </Paper>
+
+        <Paper sx={{ p: { xs: 2, sm: 3 } }}>
+          <Typography variant="h6" gutterBottom sx={{ fontSize: '1.1rem' }}>
+            Transcript
+          </Typography>
+          {interview.transcript && interview.transcript.length > 0 ? (
+            interview.transcript.map((entry) => (
+              <TranscriptEntry 
+                key={entry.id}
+                entry={{
+                  ...entry,
+                  triggerWords: entry.triggerWords || []
+                }} 
+              />
+            ))
+          ) : (
+            <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', mt: 4 }}>
+              No transcript entries found
+            </Typography>
+          )}
+        </Paper>
+      </Box>
+    );
+  };
+
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
+    <Container maxWidth="lg" sx={{ py: 4, px: { xs: 0, sm: 2 } }}>
+      <Typography 
+        variant="h4" 
+        component="h1" 
+        gutterBottom 
+        sx={{ textAlign: { xs: 'center', sm: 'left' } }}
+      >
         Interview Archive
       </Typography>
 
@@ -186,56 +312,62 @@ const Archives = () => {
         </Alert>
       )}
 
-      <Box sx={{ display: 'flex', gap: 4, height: 'calc(100vh - 120px)' }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: 'column', md: 'row' },
+        gap: { xs: 2, md: 4 }, 
+        height: { xs: 'calc(100vh - 150px)', md: 'calc(100vh - 120px)' } 
+      }}>
         <Box sx={{ 
-          width: '300px',
+          width: { xs: '100%', md: '300px' }, 
+          flex: { xs: 1, md: 'none' },
+          height: { md: 'auto' },
           overflowY: 'auto',
-          pr: 1,
-          '&::-webkit-scrollbar': {
-            width: '8px',
-          },
-          '&::-webkit-scrollbar-track': {
-            background: '#f1f1f1',
-            borderRadius: '4px',
-          },
-          '&::-webkit-scrollbar-thumb': {
-            background: '#888',
-            borderRadius: '4px',
-            '&:hover': {
-              background: '#555',
-            },
-          },
+          pr: { md: 1 },
+          '&::-webkit-scrollbar': { width: '8px' },
+          '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' },
+          '&::-webkit-scrollbar-thumb': { background: '#888', borderRadius: '4px', '&:hover': { background: '#555' } },
         }}>
           {interviews.length === 0 ? (
             <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
               No interviews found
             </Typography>
           ) : (
-            <Stack spacing={2}>
+            <Stack spacing={2} sx={{ p: { xs: 1, md: 0} }}> 
               {interviews
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                 .map((interview) => (
                   <Paper
                     key={interview.id}
+                    elevation={selectedInterview?.id === interview.id ? 4 : 1}
                     sx={{
                       p: 2,
                       cursor: 'pointer',
                       bgcolor: selectedInterview?.id === interview.id ? 'primary.main' : '#ffffff',
                       color: selectedInterview?.id === interview.id ? 'primary.contrastText' : 'text.primary',
+                      transition: 'box-shadow 0.2s, background-color 0.2s, color 0.2s',
                       '&:hover': {
-                        bgcolor: selectedInterview?.id === interview.id ? 'primary.dark' : 'grey.100',
+                        bgcolor: 'grey.100',
+                        boxShadow: 3,
                       },
+                      ...(selectedInterview?.id === interview.id && {
+                        bgcolor: 'primary.main',
+                        color: 'primary.contrastText',
+                        '&:hover': {
+                          bgcolor: 'primary.dark'
+                        }
+                      })
                     }}
-                    onClick={() => setSelectedInterview(interview)}
+                    onClick={() => handleInterviewSelect(interview)}
                   >
                     <Typography variant="subtitle2" gutterBottom>
                       {new Date(interview.date).toLocaleString()}
                     </Typography>
                     <Typography 
-                      variant="body1" 
-                      color={selectedInterview?.id === interview.id ? 'primary.contrastText' : 'text.primary'}
+                      variant="body2"
+                      noWrap
+                      color={selectedInterview?.id === interview.id ? 'rgba(255,255,255,0.8)' : 'text.secondary'}
                       sx={{ 
-                        mb: 1,
                         fontStyle: !interview.context ? 'italic' : 'normal'
                       }}
                     >
@@ -243,10 +375,12 @@ const Archives = () => {
                     </Typography>
                     <Typography 
                       variant="body1" 
+                      noWrap
                       color={selectedInterview?.id === interview.id ? 'primary.contrastText' : 'text.primary'}
                       sx={{ 
-                        fontWeight: 500,
-                        fontStyle: interview.transcript.length === 0 ? 'italic' : 'normal'
+                        mb: 1,
+                        fontStyle: !interview.context ? 'italic' : 'normal',
+                        fontWeight: 500
                       }}
                     >
                       {interview.transcript.length > 0 ? (
@@ -264,145 +398,46 @@ const Archives = () => {
           )}
         </Box>
 
-        <Paper sx={{ 
-          flex: 1, 
-          p: 3,
-          overflowY: 'auto',
-          '&::-webkit-scrollbar': {
-            width: '8px',
-          },
-          '&::-webkit-scrollbar-track': {
-            background: '#f1f1f1',
-            borderRadius: '4px',
-          },
-          '&::-webkit-scrollbar-thumb': {
-            background: '#888',
-            borderRadius: '4px',
-            '&:hover': {
-              background: '#555',
-            },
-          },
-        }}>
-          {selectedInterview ? (
-            <>
-              <Box sx={{ mb: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-                  <Stack direction="row" spacing={1}>
-                    <Button
-                      variant="outlined"
-                      startIcon={<Summarize />}
-                      onClick={handleShowSummary}
-                    >
-                      Key Highlights
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      startIcon={<Article />}
-                      onClick={() => handleDownloadTranscript(selectedInterview)}
-                    >
-                      Download Transcript
-                    </Button>
-                    {selectedInterview.audioUrl && (
-                      <Button
-                        variant="outlined"
-                        startIcon={<Download />}
-                        onClick={() => handleDownloadAudio(selectedInterview)}
-                      >
-                        Download Audio
-                      </Button>
-                    )}
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      startIcon={<Delete />}
-                      onClick={() => handleDeleteClick(selectedInterview.id)}
-                    >
-                      Delete
-                    </Button>
-                  </Stack>
-                </Box>
-              </Box>
-
-              <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h5" gutterBottom>
-                  Context
-                </Typography>
-                <Typography 
-                  variant="body1" 
-                  color="text.secondary"
-                  sx={{ fontStyle: !selectedInterview.context ? 'italic' : 'normal' }}
-                >
-                  {selectedInterview.context || 'No context provided'}
-                </Typography>
-              </Paper>
-
-              <Paper sx={{ p: 3 }}>
-                <Typography variant="h5" gutterBottom>
-                  Transcript
-                </Typography>
-                {selectedInterview.transcript && selectedInterview.transcript.length > 0 ? (
-                  selectedInterview.transcript.map((entry, index) => (
-                    <TranscriptEntry 
-                      key={index} 
-                      entry={{
-                        ...entry,
-                        triggerWords: entry.triggerWords || []
-                      }} 
-                    />
-                  ))
-                ) : (
-                  <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', mt: 4 }}>
-                    No transcript entries found
-                  </Typography>
-                )}
-              </Paper>
-
-              <Paper sx={{ p: 3, mt: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Key Highlights
-                </Typography>
-                <Stack spacing={1}>
-                  {selectedInterview.transcript
-                    .filter(entry => entry.speaker === 'user')
-                    .slice(0, 3)
-                    .map((entry, index) => (
-                      <Typography 
-                        key={index} 
-                        variant="body2" 
-                        color="text.secondary"
-                        sx={{ 
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: 1,
-                          '&::before': {
-                            content: '"•"',
-                            color: '#4A9A8C',
-                            fontWeight: 'bold',
-                          }
-                        }}
-                      >
-                        {entry.text.length > 100 
-                          ? `${entry.text.substring(0, 100)}...` 
-                          : entry.text}
-                      </Typography>
-                    ))}
-                  {selectedInterview.transcript.filter(entry => entry.speaker === 'user').length === 0 && (
-                    <Typography variant="body2" color="text.secondary">
-                      No user responses recorded
-                    </Typography>
-                  )}
-                </Stack>
-              </Paper>
-            </>
-          ) : (
-            <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', mt: 8 }}>
-              Select an interview from the list to view its details
-            </Typography>
-          )}
-        </Paper>
+        {!isMobile && (
+          <Paper sx={{ 
+            flex: 1, 
+            p: 3,
+            overflowY: 'auto',
+            '&::-webkit-scrollbar': { width: '8px' },
+            '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' },
+            '&::-webkit-scrollbar-thumb': { background: '#888', borderRadius: '4px', '&:hover': { background: '#555' } },
+          }}>
+            {selectedInterview ? (
+              renderDetailsContent(selectedInterview)
+            ) : (
+              <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', mt: 8 }}>
+                Select an interview from the list to view its details
+              </Typography>
+            )}
+          </Paper>
+        )}
       </Box>
 
-      {/* Delete Confirmation Dialog */}
+      {isMobile && (
+        <Drawer
+          anchor="bottom"
+          open={isDetailsSheetOpen}
+          onClose={handleCloseSheet}
+          ModalProps={{
+            keepMounted: true,
+          }}
+          PaperProps={{ 
+            sx: { 
+              height: '85vh',
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+            }
+          }}
+        >
+          {renderDetailsContent(selectedInterview)}
+        </Drawer>
+      )}
+
       <Dialog
         open={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}

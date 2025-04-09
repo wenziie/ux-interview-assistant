@@ -1,8 +1,9 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './styles/theme';
 import './styles/global.css';
+import { Box } from '@mui/material';
 
 // Pages
 import NewInterview from './pages/NewInterview';
@@ -25,14 +26,24 @@ function App() {
           flexDirection: 'column'
         }}>
           <Navbar />
-          <main style={{ flex: 1, padding: '2rem' }}>
+          <Box 
+            component="main" 
+            sx={{ 
+              flex: 1, 
+              padding: { 
+                xs: '1rem 0.5rem',
+                sm: '2rem' 
+              }
+            }}
+          >
             <Routes>
               <Route path="/" element={<NewInterview />} />
               <Route path="/interview" element={<OngoingInterview />} />
               <Route path="/archives" element={<Archives />} />
               <Route path="/about" element={<About />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-          </main>
+          </Box>
         </div>
       </Router>
     </ThemeProvider>

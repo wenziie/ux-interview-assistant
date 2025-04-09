@@ -3,8 +3,16 @@ import { Lightbulb, Psychology, Code, EmojiObjects, AutoAwesome } from '@mui/ico
 
 const About = () => {
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600, mb: 4 }}>
+    <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 0, sm: 2 } }}>
+      <Typography 
+        variant="h4" 
+        gutterBottom 
+        sx={{ 
+          fontWeight: 600, 
+          mb: 4, 
+          textAlign: { xs: 'center', sm: 'left' }
+        }}
+      >
         About This Project
       </Typography>
 

@@ -23,26 +23,48 @@ const NewInterview = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Typography variant="h2" component="h1" gutterBottom align="center" sx={{ mb: 4 }}>
+    <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 0, sm: 2 } }}>
+      <Typography 
+        variant="h2" 
+        component="h1" 
+        gutterBottom 
+        align="center" 
+        sx={{ 
+          mb: { xs: 3, sm: 4 }, 
+          fontSize: { xs: '2.5rem', sm: '3rem' }
+        }}
+      >
         UX Interview Assistant
       </Typography>
+      
+      {/* AI Robot Image */}
+      <Box sx={{ display: 'flex', justifyContent: 'center', mb: { xs: 3, sm: 4 } }}>
+        <img 
+          src={`./images/interview_assistant.png?v=${new Date().getTime()}`}
+          alt="AI Assistant Robot" 
+          style={{ 
+            maxWidth: '100%',
+            height: 'auto',
+            width: '200px'
+          }} 
+          sx={{ 
+            width: { xs: '150px', sm: '250px', md: '300px' }
+          }} 
+        />
+      </Box>
 
-      <Paper sx={{ p: 3, mb: 4 }}>
-        <Box sx={{ bgcolor: 'grey.50', p: 3, borderRadius: 1, mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
+      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 4 }}>
+        <Box sx={{ bgcolor: 'grey.50', p: { xs: 2, sm: 3 }, borderRadius: 1, mb: 3 }}>
+          <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
             How it works
           </Typography>
           <Typography variant="body1" color="text.secondary" paragraph>
-            This AI-powered assistant helps you conduct user interviews by recording the conversation, providing real-time transcription, and suggesting relevant follow-up questions based on the context and user responses.
+            This AI assistant supports user interviews by providing real-time transcriptions and suggesting context-aware follow-up questions based on users' responses.
           </Typography>
         </Box>
 
-        <Typography variant="h6" gutterBottom>
+        <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
           Interview Context
-        </Typography>
-        <Typography variant="body2" paragraph color="text.secondary">
-          What is this interview about? What are you trying to learn?
         </Typography>
         <TextField
           fullWidth
@@ -50,14 +72,7 @@ const NewInterview = () => {
           minRows={6}
           maxRows={20}
           variant="outlined"
-          placeholder={`Example:
-Product: Mobile banking app
-User background: Regular banking customer, uses mobile banking apps frequently
-Areas to explore:
-- Initial setup and onboarding experience
-- Daily banking tasks and user flows
-- Security features and user trust
-- Pain points with current banking apps`}
+          placeholder="What is the focus of this interview? What insights are you hoping to gather, and how can the assistant support you?"
           value={context}
           onChange={(e) => setLocalContext(e.target.value)}
           sx={{ 
@@ -73,7 +88,7 @@ Areas to explore:
             }
           }}
         />
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'center', gap: 2, mt: 3 }}>
           <Button
             variant="outlined"
             onClick={() => navigate('/archives')}

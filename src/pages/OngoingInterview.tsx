@@ -272,28 +272,49 @@ const OngoingInterview = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
+    <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 0, sm: 2 } }}>
+      {/* Header Section with Responsive Layout */}
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        justifyContent="space-between"
+        alignItems={{ xs: 'center', sm: 'center' }}
+        spacing={{ xs: 2, sm: 2 }}
+        mb={4}
+      >
+        <Typography 
+          variant="h4" 
+          component="h1" 
+          sx={{ 
+            fontSize: { xs: '1.8rem', sm: '2.125rem' },
+            textAlign: { xs: 'center', sm: 'left'}
+           }}
+        >
           Ongoing Interview
         </Typography>
         <Box sx={{ display: 'flex' }}>
           <Button
             variant={currentLanguage === 'en' ? 'contained' : 'outlined'}
-            onClick={() => setLanguage('en')}
-            disabled={currentLanguage === 'en' || isRecording}
+            onClick={() => {
+              setLanguage('en');
+              setShowLanguageAlert(true);
+            }}
+            disabled={isRecording}
             sx={{
               borderTopRightRadius: 0,
               borderBottomRightRadius: 0,
-              borderRight: 'none',
+              borderRight: currentLanguage === 'en' ? 'none' : '1px solid',
+              borderColor: 'primary.main',
+              minWidth: '100px',
+              bgcolor: currentLanguage === 'en' ? 'primary.main' : 'transparent',
+              color: currentLanguage === 'en' ? 'primary.contrastText' : 'primary.main',
               '&:hover': {
-                backgroundColor: currentLanguage === 'en' ? 'primary.main' : 'grey.100',
+                bgcolor: currentLanguage === 'en' ? 'primary.dark' : 'action.hover',
               },
-              color: currentLanguage === 'en' ? 'white' : 'primary.main',
-              bgcolor: currentLanguage === 'en' ? '#4A9A8C' : 'grey.100',
               '&.Mui-disabled': {
-                bgcolor: currentLanguage === 'en' ? '#4A9A8C' : 'grey.300',
-                color: currentLanguage === 'en' ? 'white' : 'grey.500',
+                bgcolor: currentLanguage === 'en' ? 'primary.main' : 'transparent',
+                color: currentLanguage === 'en' ? 'action.disabled' : 'action.disabled',
+                borderColor: 'action.disabledBackground',
+                opacity: 0.5
               },
             }}
           >
@@ -305,26 +326,29 @@ const OngoingInterview = () => {
               setLanguage('sv');
               setShowLanguageAlert(true);
             }}
-            disabled={currentLanguage === 'sv' || isRecording}
+            disabled={isRecording}
             sx={{
               borderTopLeftRadius: 0,
               borderBottomLeftRadius: 0,
-              borderLeft: 'none',
+              minWidth: '100px',
+              borderColor: 'primary.main',
+              bgcolor: currentLanguage === 'sv' ? 'primary.main' : 'transparent',
+              color: currentLanguage === 'sv' ? 'primary.contrastText' : 'primary.main',
               '&:hover': {
-                backgroundColor: currentLanguage === 'sv' ? 'primary.main' : 'grey.100',
+                bgcolor: currentLanguage === 'sv' ? 'primary.dark' : 'action.hover',
               },
-              color: currentLanguage === 'sv' ? 'white' : 'primary.main',
-              bgcolor: currentLanguage === 'sv' ? '#4A9A8C' : 'grey.100',
               '&.Mui-disabled': {
-                bgcolor: currentLanguage === 'sv' ? '#4A9A8C' : 'grey.300',
-                color: currentLanguage === 'sv' ? 'white' : 'grey.500',
+                bgcolor: currentLanguage === 'sv' ? 'primary.main' : 'transparent',
+                color: currentLanguage === 'sv' ? 'action.disabled' : 'action.disabled',
+                borderColor: 'action.disabledBackground',
+                opacity: 0.5
               },
             }}
           >
-            Svenska
+            Swedish
           </Button>
         </Box>
-      </Box>
+      </Stack>
 
       <Paper sx={{ p: 3, mb: 3, bgcolor: '#ffffff' }}>
         <Typography variant="h6" gutterBottom>
