@@ -82,7 +82,7 @@ const FollowUpBanner = ({ questions, triggerWords, onClose }: FollowUpBannerProp
       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#F57C00' }}>
-            AI suggests
+            Suggestions
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CircularProgress

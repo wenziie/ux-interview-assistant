@@ -22,6 +22,7 @@ import {
   useTheme,
   IconButton,
   CircularProgress,
+  Collapse,
 } from '@mui/material';
 import {
   Delete,
@@ -29,6 +30,7 @@ import {
   Summarize,
   Article,
   Close,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 import TranscriptEntry from '../components/TranscriptEntry';
 
@@ -46,7 +48,7 @@ interface Interview {
   id: string;
   date: string;
   context: string;
-  aiFeaturesEnabled?: boolean;
+  assistantMode: 'hardcoded' | 'ai';
   transcript: TranscriptEntryType[];
   audioUrl?: string;
   summary?: string;
@@ -62,6 +64,7 @@ const Archives = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [interviewToDelete, setInterviewToDelete] = useState<string | null>(null);
   const [showConfirmSummaryDialog, setConfirmSummaryDialog] = useState(false);
+  const [isContextExpanded, setIsContextExpanded] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -70,32 +73,41 @@ const Archives = () => {
   useEffect(() => {
     try {
       const savedInterviews = JSON.parse(localStorage.getItem('interviews') || '[]') as unknown[];
-      const validInterviews = savedInterviews.filter((interview: unknown): interview is Interview => {
-        if (!(typeof interview === 'object' && interview !== null &&
-            'id' in interview && typeof interview.id === 'string' &&
-            'date' in interview && typeof interview.date === 'string' &&
-            'context' in interview && typeof interview.context === 'string' &&
-            'transcript' in interview && Array.isArray(interview.transcript)))
-        {
-            return false;
+      const validInterviews = savedInterviews.filter((item: unknown): item is Interview => {
+        const interview = item as Partial<Interview>;
+        if (!(typeof interview === 'object' && interview !== null)) return false;
+
+        if (typeof interview.id !== 'string') return false;
+        if (typeof interview.date !== 'string') return false;
+        if (typeof interview.context !== 'string') return false;
+        if (!Array.isArray(interview.transcript)) return false;
+
+        const mode = interview.assistantMode;
+        const oldFlag = (interview as any).aiFeaturesEnabled;
+        if (mode !== 'hardcoded' && mode !== 'ai') {
+            if (typeof oldFlag !== 'boolean') return false;
+            interview.assistantMode = oldFlag ? 'ai' : 'hardcoded';
+            delete (interview as any).aiFeaturesEnabled;
         }
-        if (('aiFeaturesEnabled' in interview) && typeof (interview as Interview).aiFeaturesEnabled !== 'boolean') return false;
-        if (('audioUrl' in interview) && typeof (interview as Interview).audioUrl !== 'string') return false;
-        if (('summary' in interview) && typeof (interview as Interview).summary !== 'string') return false;
+
+        if (interview.audioUrl !== undefined && typeof interview.audioUrl !== 'string') return false;
+        if (interview.summary !== undefined && typeof interview.summary !== 'string') return false;
         
-        return interview.transcript.every((entry: unknown, index: number): boolean => {
-           if (typeof entry === 'object' && entry !== null &&
-               'text' in entry && 'speaker' in entry && 'timestamp' in entry) {
-             if (!('id' in entry) || typeof (entry as {id?: unknown}).id !== 'string') {
-               (entry as {id?: unknown}).id = `${(interview as Interview).id}-entry-${index}`;
-             }
-             return true;
-           }
-           return false;
+        if (!interview.transcript.every((entry: any) => 
+            typeof entry === 'object' && entry !== null &&
+            typeof entry.text === 'string' && typeof entry.speaker === 'string' && typeof entry.timestamp === 'string'
+        )) return false;
+
+        interview.transcript.forEach((entry: any, index: number) => {
+          if (!entry.id) {
+            entry.id = `${interview.id}-entry-${index}`;
+          }
         });
+
+        return true;
       });
 
-      setInterviews(validInterviews);
+      setInterviews(validInterviews as Interview[]);
       setError(null);
     } catch (err) {
       console.error('Error loading interviews:', err);
@@ -103,6 +115,10 @@ const Archives = () => {
       setInterviews([]);
     }
   }, []);
+
+  useEffect(() => {
+    setIsContextExpanded(false);
+  }, [selectedInterview]);
 
   const handleInterviewSelect = (interview: Interview) => {
     setSelectedInterview(interview);
@@ -250,6 +266,8 @@ const Archives = () => {
   const renderDetailsContent = (interview: Interview | null) => {
     if (!interview) return null;
 
+    const showExpandButton = interview.context && (interview.context.split('\n').length > 1 || interview.context.length > 150);
+
     return (
       <Box sx={{ p: { xs: 2, sm: 3 }, pt: { xs: 5, sm: 3 }, height: '100%', overflowY: 'auto' }}>
         {isMobile && (
@@ -312,17 +330,64 @@ const Archives = () => {
             </Button>
         </Box>
 
+        <Box sx={{ mb: 3, pl: { xs: 2, sm: 3} }}>
+           <Typography variant="body2" sx={{ fontWeight: 500 }}>
+             Assistant Mode Used:
+           </Typography>
+           <Typography variant="body2" color="text.secondary">
+             {interview.assistantMode === 'ai' ? 'AI (LLM)' : 'Hardcoded'}
+           </Typography>
+        </Box>
+
         <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
           <Typography variant="h6" gutterBottom sx={{ fontSize: '1.1rem' }}>
             Context
           </Typography>
-          <Typography 
-            variant="body1" 
-            color="text.secondary"
-            sx={{ fontStyle: !interview.context ? 'italic' : 'normal' }}
-          >
-            {interview.context || 'No context provided'}
-          </Typography>
+          {interview.context ? (
+            <>
+              {!isContextExpanded && (
+                <Typography 
+                  variant="body1" 
+                  color="text.secondary"
+                  noWrap 
+                  sx={{ mb: 1 }}
+                >
+                  {interview.context.split('\n')[0]}
+                </Typography>
+              )}
+              <Collapse in={isContextExpanded} timeout="auto" unmountOnExit>
+                <Typography 
+                  variant="body1" 
+                  color="text.secondary"
+                  sx={{ whiteSpace: 'pre-wrap', mb: 1 }}
+                >
+                  {interview.context}
+                </Typography>
+              </Collapse>
+              {showExpandButton && (
+                 <Button 
+                    variant="text" 
+                    size="small"
+                    onClick={() => setIsContextExpanded(!isContextExpanded)}
+                    startIcon={
+                      <ExpandMoreIcon 
+                        sx={{
+                          transform: isContextExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.3s',
+                        }}
+                      />
+                    }
+                    sx={{ textAlign: 'left', p: 0, textTransform: 'none', mt: 0.5 }}
+                  >
+                    {isContextExpanded ? 'Show Less' : 'Show More'}
+                 </Button>
+              )}
+            </>
+          ) : (
+            <Typography variant="body1" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+              No context provided
+            </Typography>
+          )}
         </Paper>
 
         <Paper sx={{ p: { xs: 2, sm: 3 } }}>
@@ -350,7 +415,7 @@ const Archives = () => {
   };
 
   return (
-    <Container maxWidth={isMobile || !selectedInterview ? 'md' : 'xl'} sx={{ pt: 2 }}>
+    <Container maxWidth={isMobile ? 'md' : 'xl'} sx={{ pt: 2 }}>
       <Typography 
         variant="h4" 
         component="h1" 
@@ -402,7 +467,6 @@ const Archives = () => {
                       transition: 'box-shadow 0.2s, background-color 0.2s, color 0.2s',
                       '&:hover': {
                         bgcolor: 'grey.100',
-                        boxShadow: 3,
                       },
                       ...(selectedInterview?.id === interview.id && {
                         bgcolor: 'primary.main',

@@ -45,7 +45,7 @@ class AudioRecorder {
       
       // Add AI entry with formatted questions
       store.addTranscriptEntry({
-        text: `Hardcoded assistant suggests:\n${aiQuestions.map(q => `• ${q}`).join('\n')}`,
+        text: `Assistant suggests:\n${aiQuestions.map(q => `• ${q}`).join('\n')}`,
         speaker: 'ai',
         type: 'silence',
         timestamp: new Date().toLocaleTimeString('en-US', { 

@@ -9,9 +9,11 @@ import {
   Alert,
   Snackbar,
   CircularProgress,
+  Collapse,
 } from '@mui/material';
 import {
   QueryStats,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import useInterviewStore from '../store/interviewStore';
@@ -45,6 +47,7 @@ const OngoingInterview = () => {
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [llmAnalysisError, setLlmAnalysisError] = useState<string | null>(null);
+  const [isContextExpanded, setIsContextExpanded] = useState(false);
 
   useEffect(() => {
     console.log(`Setting up SpeechRecognition for language: ${currentLanguage}`);
@@ -95,7 +98,7 @@ const OngoingInterview = () => {
               setShowBanner(true);
               
               addTranscriptEntry({
-                text: `Hardcoded assistant suggests:\n${analysis.questions.map(q => `• ${q}`).join('\n')}`,
+                text: `Assistant suggests:\n${analysis.questions.map(q => `• ${q}`).join('\n')}`,
                 speaker: 'ai',
                 type: 'keyword',
                 timestamp,
@@ -231,7 +234,7 @@ const OngoingInterview = () => {
       id: Date.now().toString(),
       date: new Date().toISOString(),
       context,
-      aiFeaturesEnabled: assistantMode === 'ai',
+      assistantMode: assistantMode,
       transcript: formattedTranscript,
       audioUrl: blob ? URL.createObjectURL(blob) : undefined,
     };
@@ -300,7 +303,7 @@ const OngoingInterview = () => {
       });
 
       addTranscriptEntry({
-        text: `AI Assistant:\n${analysisText}`,
+        text: `AI Assistant suggests:\n${analysisText}`,
         speaker: 'ai',
         timestamp,
       });
@@ -323,182 +326,267 @@ const OngoingInterview = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 0, sm: 2 } }}>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        justifyContent="space-between"
-        alignItems={{ xs: 'center', sm: 'center' }}
-        spacing={{ xs: 2, sm: 2 }}
-        mb={4}
-      >
-        <Typography 
-          variant="h4" 
-          component="h1" 
-          sx={{ 
-            fontSize: { xs: '1.8rem', sm: '2.125rem' },
-            textAlign: { xs: 'center', sm: 'left'}
-           }}
+    <Container 
+      maxWidth="lg" 
+      sx={{
+         display: 'flex', 
+         flexDirection: 'column',
+         height: 'calc(100vh - 64px - 16px)',
+         py: { xs: 1, sm: 2 },
+         px: { xs: 0, sm: 2 },
+         gap: 2
+      }}
+    >
+      <Box>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          justifyContent="space-between"
+          alignItems={{ xs: 'center', sm: 'center' }}
+          spacing={{ xs: 2, sm: 2 }}
+          mb={2}
         >
-          Ongoing Interview
-        </Typography>
-        <Box sx={{ display: 'flex' }}>
-          <Button
-            variant={currentLanguage === 'en' ? 'contained' : 'outlined'}
-            onClick={() => {
-              setLanguage('en');
-              setShowLanguageAlert(true);
-            }}
-            disabled={isRecording}
-            sx={{
-              borderTopRightRadius: 0,
-              borderBottomRightRadius: 0,
-              borderRight: currentLanguage === 'en' ? 'none' : '1px solid',
-              borderColor: 'primary.main',
-              minWidth: '100px',
-              bgcolor: currentLanguage === 'en' ? 'primary.main' : 'transparent',
-              color: currentLanguage === 'en' ? 'primary.contrastText' : 'primary.main',
-              '&:hover': {
-                bgcolor: currentLanguage === 'en' ? 'primary.dark' : 'action.hover',
-              },
-              '&.Mui-disabled': {
+          <Typography 
+            variant="h5" 
+            component="h1" 
+            sx={{ 
+              textAlign: { xs: 'center', sm: 'left'}
+             }}
+          >
+            Ongoing Interview
+          </Typography>
+          <Box sx={{ display: 'flex' }}>
+            <Button
+              variant={currentLanguage === 'en' ? 'contained' : 'outlined'}
+              onClick={() => {
+                setLanguage('en');
+              }}
+              disabled={isRecording}
+              sx={{
+                borderTopRightRadius: 0,
+                borderBottomRightRadius: 0,
+                borderRight: currentLanguage === 'en' ? 'none' : '1px solid',
+                borderColor: 'primary.main',
+                minWidth: '100px',
                 bgcolor: currentLanguage === 'en' ? 'primary.main' : 'transparent',
-                color: currentLanguage === 'en' ? 'action.disabled' : 'action.disabled',
-                borderColor: 'action.disabledBackground',
-                opacity: 0.5
-              },
-            }}
-          >
-            English
-          </Button>
-          <Button
-            variant={currentLanguage === 'sv' ? 'contained' : 'outlined'}
-            onClick={() => {
-              setLanguage('sv');
-              setShowLanguageAlert(true);
-            }}
-            disabled={isRecording}
-            sx={{
-              borderTopLeftRadius: 0,
-              borderBottomLeftRadius: 0,
-              minWidth: '100px',
-              borderColor: 'primary.main',
-              bgcolor: currentLanguage === 'sv' ? 'primary.main' : 'transparent',
-              color: currentLanguage === 'sv' ? 'primary.contrastText' : 'primary.main',
-              '&:hover': {
-                bgcolor: currentLanguage === 'sv' ? 'primary.dark' : 'action.hover',
-              },
-              '&.Mui-disabled': {
+                color: currentLanguage === 'en' ? 'primary.contrastText' : 'primary.main',
+                '&:hover': {
+                  bgcolor: currentLanguage === 'en' ? 'primary.dark' : 'action.hover',
+                },
+                '&.Mui-disabled': {
+                  bgcolor: currentLanguage === 'en' ? 'primary.main' : 'transparent',
+                  color: currentLanguage === 'en' ? 'action.disabled' : 'action.disabled',
+                  borderColor: 'action.disabledBackground',
+                  opacity: 0.5
+                },
+              }}
+            >
+              English
+            </Button>
+            <Button
+              variant={currentLanguage === 'sv' ? 'contained' : 'outlined'}
+              onClick={() => {
+                setLanguage('sv');
+                if (assistantMode === 'hardcoded') { 
+                  setShowLanguageAlert(true);
+                }
+              }}
+              disabled={isRecording}
+              sx={{
+                borderTopLeftRadius: 0,
+                borderBottomLeftRadius: 0,
+                minWidth: '100px',
+                borderColor: 'primary.main',
                 bgcolor: currentLanguage === 'sv' ? 'primary.main' : 'transparent',
-                color: currentLanguage === 'sv' ? 'action.disabled' : 'action.disabled',
-                borderColor: 'action.disabledBackground',
-                opacity: 0.5
-              },
-            }}
-          >
-            Swedish
-          </Button>
-        </Box>
-      </Stack>
+                color: currentLanguage === 'sv' ? 'primary.contrastText' : 'primary.main',
+                '&:hover': {
+                  bgcolor: currentLanguage === 'sv' ? 'primary.dark' : 'action.hover',
+                },
+                '&.Mui-disabled': {
+                  bgcolor: currentLanguage === 'sv' ? 'primary.main' : 'transparent',
+                  color: currentLanguage === 'sv' ? 'action.disabled' : 'action.disabled',
+                  borderColor: 'action.disabledBackground',
+                  opacity: 0.5
+                },
+              }}
+            >
+              Swedish
+            </Button>
+          </Box>
+        </Stack>
+        <Paper sx={{ p: 3, bgcolor: '#ffffff' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1}}>
+            <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
+              Interview Context
+            </Typography>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                Assistant Mode Used:
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {assistantMode === 'ai' ? 'AI (LLM)' : 'Hardcoded'}
+              </Typography>
+            </Box>
+          </Box>
+          {context ? (
+            <>
+              {!isContextExpanded && (
+                <Typography 
+                  variant="body1" 
+                  color="text.secondary"
+                  noWrap
+                  sx={{ mb: 1 }}
+                >
+                  {context.split('\n')[0]}
+                </Typography>
+              )}
+              <Collapse in={isContextExpanded} timeout="auto" unmountOnExit>
+                <Typography 
+                  variant="body1" 
+                  color="text.secondary"
+                  sx={{
+                    whiteSpace: 'pre-wrap',
+                    mb: 1,
+                  }}
+                >
+                  {context}
+                </Typography>
+              </Collapse>
+              {context && (context.split('\n').length > 2 || context.length > 150) && (
+                <Button 
+                  variant="text" 
+                  size="small"
+                  onClick={() => setIsContextExpanded(!isContextExpanded)}
+                  startIcon={
+                    <ExpandMoreIcon 
+                      sx={{
+                        transform: isContextExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.3s',
+                      }}
+                    />
+                  }
+                  sx={{ 
+                    textAlign: 'left', 
+                    p: 0,
+                    textTransform: 'none',
+                    mt: 0.5
+                  }}
+                >
+                  {isContextExpanded ? 'Show Less' : 'Show More'}
+                </Button>
+              )}
+            </>
+          ) : (
+            <Typography variant="body1" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+              No context provided
+            </Typography>
+          )}
+        </Paper>
+      </Box>
 
-      <Paper sx={{ p: 3, mb: 3, bgcolor: '#ffffff' }}>
+      <Paper sx={{
+          p: 3, 
+          bgcolor: '#ffffff', 
+          flexGrow: 1,
+          minHeight: 200,
+          display: 'flex',
+          flexDirection: 'column'
+      }}>
         <Typography variant="h6" gutterBottom>
-          Interview Context
+          Transcript
         </Typography>
-        <Typography 
-          variant="body1" 
-          color="text.secondary"
-          sx={{ fontStyle: !context ? 'italic' : 'normal' }}
-        >
-          {context || 'No context provided'}
-        </Typography>
+
+        <Box sx={{ flexGrow: 1, overflowY: 'auto', pt: 2 }}>
+          {transcript.length === 0 && !interimTranscript && (
+            <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', mt: 8 }}>
+              Your transcript will appear here when you start recording
+            </Typography>
+          )}
+
+          {isRecording && interimTranscript && (
+            <>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Live Caption:
+              </Typography>
+              <Box
+                sx={{
+                  py: 1,
+                  px: 2,
+                  mb: 2,
+                  bgcolor: '#F5F5F5',
+                  borderRadius: 1,
+                  opacity: 0.9,
+                }}
+              >
+                <Typography variant="body1" color="text.secondary">
+                  {interimTranscript}
+                </Typography>
+              </Box>
+            </>
+          )}
+
+          {transcript.map((entry, index) => (
+            <TranscriptEntry key={entry.id || index} entry={entry} />
+          ))}
+        </Box>
       </Paper>
 
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
-        {!isRecording ? (
-          <Button
-            variant="contained"
-            onClick={handleStartRecording}
-            size="large"
-          >
-            Start Recording
-          </Button>
-        ) : (
-          <Stack direction="row" spacing={2} alignItems="center">
+      <Box 
+        sx={{
+          p: 0.5,
+          pb: 2,
+          display: 'flex',
+          justifyContent: 'center',
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}> 
+          {!isRecording ? (
             <Button
               variant="contained"
-              color="primary"
-              onClick={handlePauseResume}
+              onClick={handleStartRecording}
+              size="large"
             >
-              {isPaused ? 'Resume Recording' : 'Pause Recording'}
+              Start Recording
             </Button>
-            
-            {assistantMode === 'ai' && (
+          ) : (
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handlePauseResume}
+              >
+                {isPaused ? 'Resume Recording' : 'Pause Recording'}
+              </Button>
+              
+              {assistantMode === 'ai' && (
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  onClick={handleAnalyzeNow}
+                  disabled={isAnalyzing || isPaused}
+                  startIcon={isAnalyzing ? <CircularProgress size={20} color="inherit" /> : <QueryStats />}
+                >
+                  {isAnalyzing ? 'Analyzing...' : 'Analyze Now'}
+                </Button>
+              )}
+              
               <Button
                 variant="outlined"
-                color="secondary"
-                onClick={handleAnalyzeNow}
-                disabled={isAnalyzing || isPaused}
-                startIcon={isAnalyzing ? <CircularProgress size={20} color="inherit" /> : <QueryStats />}
+                color="error"
+                onClick={handleStopRecording}
               >
-                {isAnalyzing ? 'Analyzing...' : 'Analyze Now'}
+                End Interview
               </Button>
-            )}
-            
-            <Button
-              variant="outlined"
-              color="error"
-              onClick={handleStopRecording}
-            >
-              End Interview
-            </Button>
-          </Stack>
-        )}
+            </Stack>
+          )}
+        </Box>
       </Box>
 
       {llmAnalysisError && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLlmAnalysisError(null)}>{llmAnalysisError}</Alert>
       )}
 
-      <Paper sx={{ p: 3, minHeight: 400, bgcolor: '#ffffff' }}>
-        <Typography variant="h6" gutterBottom>
-          Transcript
-        </Typography>
-
-        {transcript.length === 0 && !interimTranscript && (
-          <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', mt: 8 }}>
-            Your transcript will appear here when you start recording
-          </Typography>
-        )}
-
-        {isRecording && interimTranscript && (
-          <>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Live Caption:
-            </Typography>
-            <Box
-              sx={{
-                py: 1,
-                px: 2,
-                mb: 2,
-                bgcolor: '#F5F5F5',
-                borderRadius: 1,
-                opacity: 0.9,
-              }}
-            >
-              <Typography variant="body1" color="text.secondary">
-                {interimTranscript}
-              </Typography>
-            </Box>
-          </>
-        )}
-
-        {transcript.map((entry, index) => (
-          <TranscriptEntry key={entry.id || index} entry={entry} />
-        ))}
-      </Paper>
-
       {showBanner && (
-        <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1300 }}>
+        <Box sx={{ position: 'absolute', bottom: 80, right: 24, zIndex: 1300 }}>
           <FollowUpBanner
             questions={bannerQuestions}
             onClose={() => setShowBanner(false)}
