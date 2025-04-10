@@ -1,5 +1,6 @@
 import { Box, Typography } from '@mui/material';
 import { Settings, Person, Lightbulb } from '@mui/icons-material';
+import ReactMarkdown from 'react-markdown';
 
 interface TranscriptEntryProps {
   entry: {
@@ -50,36 +51,72 @@ const TranscriptEntry = ({ entry }: TranscriptEntryProps) => {
         >
           {entry.timestamp}
         </Typography>
-        <Typography
-          variant="body1"
-          sx={{
-            color: entry.speaker === 'ai' ? '#F57C00' :
-                   entry.speaker === 'system' ? 'text.secondary' :
-                   '#2A6A5E',
-            whiteSpace: 'pre-line',
-          }}
-        >
-          {entry.speaker === 'user' && entry.triggerWords && entry.triggerWords.length > 0 ? (
-            <>
-              {entry.text.split(new RegExp(`(${entry.triggerWords.map(word => word.replace(/[-\\^$*+?.()|[\]{}]/g, '\\$&')).join('|')})`, 'i')).map((part, i) => {
-                // Check if this part matches any trigger word (case insensitive)
-                const isTrigger = entry.triggerWords?.some(
-                  word => part.toLowerCase() === word.toLowerCase()
-                );
-                
-                return isTrigger ? (
-                  <span key={i} style={{ backgroundColor: '#FFF59D', padding: '0 2px', borderRadius: '2px', fontWeight: 'bold' }}>
-                    {part}
-                  </span>
-                ) : (
-                  part
-                );
-              })}
-            </>
-          ) : (
-            entry.text
-          )}
-        </Typography>
+        
+        {entry.speaker === 'ai' ? (
+           (() => {
+              const parts = entry.text.split('\n\n');
+              const label = parts[0];
+              const markdownContent = parts.slice(1).join('\n\n');
+              
+              return (
+                <Box sx={{color: '#F57C00'}}>
+                  <Typography variant="body1" sx={{ mb: 1.5 }}>
+                    {label}
+                  </Typography>
+                  <Box sx={{
+                    '& > *:first-of-type': { marginTop: 0 }, 
+                    '& ul': { marginTop: 0, paddingLeft: '20px', marginBottom: '1em' },
+                  }}>
+                    <ReactMarkdown
+                      components={{
+                        strong: ({node, ...props}) => 
+                          <Typography 
+                            variant="subtitle2"
+                            component="strong" 
+                            sx={{ fontWeight: 'bold', mb: 0.5 }}
+                            {...props} 
+                          />,
+                        li: ({node, ...props}) => 
+                          <li style={{ marginTop: 0 }} {...props} />
+                      }}
+                    >
+                      {markdownContent}
+                    </ReactMarkdown>
+                  </Box>
+                </Box>
+              );
+           })()
+        ) : (
+          <Typography
+            variant="body1"
+            sx={{
+              color: entry.speaker === 'system' ? 'text.secondary' :
+                     '#2A6A5E',
+              whiteSpace: 'pre-line',
+            }}
+          >
+            {entry.speaker === 'user' && entry.triggerWords && entry.triggerWords.length > 0 ? (
+              <>
+                {entry.text.split(new RegExp(`(${entry.triggerWords.map(word => word.replace(/[-\\^$*+?.()|[\]{}]/g, '\\$&')).join('|')})`, 'i')).map((part, i) => {
+                  // Check if this part matches any trigger word (case insensitive)
+                  const isTrigger = entry.triggerWords?.some(
+                    word => part.toLowerCase() === word.toLowerCase()
+                  );
+                  
+                  return isTrigger ? (
+                    <span key={i} style={{ backgroundColor: '#FFF59D', padding: '0 2px', borderRadius: '2px', fontWeight: 'bold' }}>
+                      {part}
+                    </span>
+                  ) : (
+                    part
+                  );
+                })}
+              </>
+            ) : (
+              entry.text
+            )}
+          </Typography>
+        )}
       </Box>
     </Box>
   );

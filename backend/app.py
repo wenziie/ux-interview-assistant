@@ -73,7 +73,20 @@ def analyze_interview():
     {formatted_transcript}
     --- END TRANSCRIPT ---
 
-    Based *only* on the provided context and transcript, suggest 1-3 insightful follow-up questions the interviewer could ask OR briefly mention 1-2 key themes emerging. Focus on the most recent parts of the conversation if relevant. Be concise.
+    Based *only* on the provided context and transcript, suggest EITHER 1-2 insightful follow-up questions the interviewer could ask OR mention 1-2 key themes emerging. Focus on the most recent parts of the conversation if relevant.
+
+    Format the output *exactly* like this, using standard markdown list syntax:
+    Place the first list item immediately on the line below the bold header, with no blank line in between.
+
+    **Follow up questions**
+    * [Question 1]
+    * [Question 2 (if applicable)]
+
+    **Key themes**
+    * [Theme 1]
+    * [Theme 2 (if applicable)]
+    
+    Ensure there is a blank line between the end of one list and the start of the next header. Only include the sections (questions or themes) that you generate.
     """
 
     try:
