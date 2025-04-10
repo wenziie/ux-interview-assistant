@@ -53,39 +53,17 @@ const TranscriptEntry = ({ entry }: TranscriptEntryProps) => {
         </Typography>
         
         {entry.speaker === 'ai' ? (
-           (() => {
-              const parts = entry.text.split('\n\n');
-              const label = parts[0];
-              const markdownContent = parts.slice(1).join('\n\n');
-              
-              return (
-                <Box sx={{color: '#F57C00'}}>
-                  <Typography variant="body1" sx={{ mb: 1.5 }}>
-                    {label}
-                  </Typography>
-                  <Box sx={{
-                    '& > *:first-of-type': { marginTop: 0 }, 
-                    '& ul': { marginTop: 0, paddingLeft: '20px', marginBottom: '1em' },
-                  }}>
-                    <ReactMarkdown
-                      components={{
-                        strong: ({node, ...props}) => 
-                          <Typography 
-                            variant="subtitle2"
-                            component="strong" 
-                            sx={{ fontWeight: 'bold', mb: 0.5 }}
-                            {...props} 
-                          />,
-                        li: ({node, ...props}) => 
-                          <li style={{ marginTop: 0 }} {...props} />
-                      }}
-                    >
-                      {markdownContent}
-                    </ReactMarkdown>
-                  </Box>
-                </Box>
-              );
-           })()
+           <Box sx={{
+             '& ul': { marginTop: 0, paddingLeft: '20px', marginBottom: '1em' }, 
+             color: '#F57C00' 
+            }}>
+              <Typography variant="body2" sx={{ mb: 2, fontWeight: 500 }}>
+                AI Assistant suggests:
+              </Typography>
+              <ReactMarkdown>
+                {entry.text}
+              </ReactMarkdown>
+           </Box>
         ) : (
           <Typography
             variant="body1"

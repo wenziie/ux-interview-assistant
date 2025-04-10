@@ -303,7 +303,7 @@ const OngoingInterview = () => {
       });
 
       addTranscriptEntry({
-        text: `AI Assistant suggests:\n\n${analysisText}`,
+        text: analysisText,
         speaker: 'ai',
         timestamp,
       });
